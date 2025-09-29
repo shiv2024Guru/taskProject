@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Login - Daily Planner</title>
+  <style>
+    :root{--bg:#0f172a;--panel:#111827;--muted:#94a3b8;--text:#e5e7eb;--accent:#22d3ee;--violet:#a78bfa}
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;background:radial-gradient(1200px 600px at 10% -10%, #1e293b 0%, transparent 50%),radial-gradient(1000px 500px at 110% 10%, #0ea5e9 0%, transparent 40%),linear-gradient(180deg,#0b1022 0%,#0f172a 60%);color:var(--text);display:grid;place-items:center}
+    .card{width:min(420px,92vw);background:rgba(17,24,39,.8);border:1px solid rgba(148,163,184,.18);border-radius:16px;padding:22px;box-shadow:0 20px 40px rgba(0,0,0,.4)}
+    .brand{display:flex;align-items:center;gap:12px;margin-bottom:8px}
+    .logo{width:36px;height:36px;border-radius:10px;background:conic-gradient(from 180deg at 50% 50%, var(--accent), var(--violet), var(--accent));box-shadow:inset 0 0 20px rgba(255,255,255,.12), 0 6px 20px rgba(0,0,0,.35)}
+    h1{margin:0 0 6px;font-size:22px}
+    p{margin:0 0 16px;color:var(--muted)}
+    label{display:block;margin:10px 0 6px;color:var(--text);font-weight:700}
+    input{width:100%;padding:12px 14px;border-radius:12px;border:1px solid rgba(148,163,184,.2);background:rgba(255,255,255,.04);color:var(--text);outline:none}
+    .row{display:flex;gap:10px;align-items:center}
+    .btn{appearance:none;border:none;border-radius:12px;padding:12px 14px;font-weight:800;cursor:pointer;color:#0b1022;background:linear-gradient(180deg,#ecfeff 0%,#a5f3fc 100%);box-shadow:0 8px 16px rgba(34,211,238,.25)}
+    .muted{color:var(--muted);font-size:14px}
+    .error{color:#f87171;font-size:13px;min-height:18px}
+  </style>
+  <script>
+    (function(){
+      const SESSION_KEY = 'planner.session.user';
+      const LAST_USER_KEY = 'planner.lastUser';
+      const TASKS_KEY = 'planner.tasks.v1';
+      const ROUTINE_KEY = 'planner.routines.v1';
+      if (sessionStorage.getItem(SESSION_KEY)) {
+        location.href = 'task.html';
+      }
+      window.addEventListener('DOMContentLoaded', function(){
+        const form = document.getElementById('loginForm');
+        const nameInput = document.getElementById('name');
+        const error = document.getElementById('error');
+        form.addEventListener('submit', function(e){
+          e.preventDefault();
+          const name = (nameInput.value || '').trim();
+          if (!name) { error.textContent = 'Please enter your name.'; nameInput.focus(); return; }
+          const prev = localStorage.getItem(LAST_USER_KEY);
+          if (!prev || prev !== name) {
+            localStorage.removeItem(TASKS_KEY);
+            localStorage.removeItem(ROUTINE_KEY);
+          }
+          localStorage.setItem(LAST_USER_KEY, name);
+          sessionStorage.setItem(SESSION_KEY, JSON.stringify({ name, ts: Date.now() }));
+          location.href = 'task.html';
+        });
+      });
+    })();
+  </script>
+</head>
+<body>
+  <div class="card">
+    <div class="brand"><div class="logo" aria-hidden="true"></div><div style="font-weight:800">Daily Planner</div></div>
+    <h1>Welcome back</h1>
+    <p>Sign in with just your name to manage tasks and routines.</p>
+    <form id="loginForm">
+      <label for="name">Your name</label>
+      <input id="name" placeholder="e.g. Alex" autocomplete="off" />
+      <div id="error" class="error"></div>
+      <div class="row" style="justify-content:flex-end;margin-top:10px">
+        <button class="btn" type="submit">Continue</button>
+      </div>
+    </form>
+    <p class="muted" style="margin-top:12px">This demo stores session in sessionStorage only.</p>
+  </div>
+</body>
+</html>
+
+
