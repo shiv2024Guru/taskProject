@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Daily Planner - Tasks & Routine</title>
+  <style>
+    :root{--bg:#0f172a;--panel:#111827;--soft:#1f2937;--muted:#94a3b8;--text:#e5e7eb;--accent:#22d3ee;--violet:#a78bfa;--danger:#f87171;--success:#34d399}
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;color:var(--text);background:radial-gradient(1200px 600px at 10% -10%, #1e293b 0%, transparent 50%),radial-gradient(1000px 500px at 110% 10%, #0ea5e9 0%, transparent 40%),linear-gradient(180deg,#0b1022 0%,#0f172a 60%)}
+    header{position:sticky;top:0;z-index:10;backdrop-filter:blur(8px);background:rgba(15,23,42,.6);border-bottom:1px solid rgba(148,163,184,.18)}
+    .nav{max-width:1000px;margin:0 auto;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .brand{display:flex;align-items:center;gap:10px;font-weight:800}
+    .logo{width:28px;height:28px;border-radius:8px;background:conic-gradient(from 180deg at 50% 50%, var(--accent), var(--violet), var(--accent))}
+    .user{color:var(--muted);font-size:14px}
+    .btn{appearance:none;border:none;border-radius:12px;padding:10px 12px;font-weight:800;cursor:pointer;color:#0b1022;background:linear-gradient(180deg,#ecfeff 0%,#a5f3fc 100%)}
+    .btn-ghost{background:rgba(255,255,255,.06);color:var(--text);border:1px solid rgba(148,163,184,.18)}
+    main{max-width:1000px;margin:18px auto 80px;padding:0 16px}
+    .tabs{display:flex;gap:8px;border-bottom:1px solid rgba(148,163,184,.18)}
+    .tab{padding:10px 14px;border:1px solid rgba(148,163,184,.18);border-bottom:none;border-top-left-radius:12px;border-top-right-radius:12px;background:rgba(17,24,39,.75);cursor:pointer}
+    .tab.active{background:linear-gradient(180deg, rgba(34,211,238,.12), rgba(167,139,250,.12))}
+    .panel{border:1px solid rgba(148,163,184,.18);border-top:none;border-bottom-left-radius:12px;border-bottom-right-radius:12px;background:rgba(17,24,39,.75);box-shadow:0 16px 32px rgba(0,0,0,.35)}
+    .section{padding:14px}
+    .row{display:flex;align-items:center;gap:10px}
+    .grow{flex:1}
+    input, select, textarea{width:100%;padding:10px 12px;border-radius:10px;border:1px solid rgba(148,163,184,.18);background:rgba(255,255,255,.04);color:var(--text);outline:none}
+    .list{display:grid;gap:8px;margin-top:10px}
+    .item{display:grid;grid-template-columns: 24px 1fr auto;gap:10px;align-items:center;background:rgba(255,255,255,.04);border:1px solid rgba(148,163,184,.18);border-radius:12px;padding:8px}
+    .item.done{opacity:.7;text-decoration:line-through}
+    .badge{display:inline-grid;place-items:center;min-width:22px;height:22px;border-radius:999px;background:#64748b;color:white;font-size:12px}
+    .muted{color:var(--muted);font-size:13px}
+    .danger{color:var(--danger)}
+    .success{color:var(--success)}
+    .small{padding:8px 10px;border-radius:10px}
+    @media(max-width:720px){.item{grid-template-columns:24px 1fr}.nav{flex-wrap:wrap;}}
+    .days{display:flex;flex-wrap:wrap;gap:8px;padding:4px}
+    .chip{display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(148,163,184,.35);background:rgba(255,255,255,.12);border-radius:999px;padding:8px 14px;color:var(--text);font-weight:600}
+    .chip input{accent-color:var(--accent);width:16px;height:16px}
+    /* Routine input emphasis */
+    #panelRoutine #routineName{flex:2;min-width:260px;color:#ffffff;font-size:16px}
+    #panelRoutine #routineTime{flex:1;min-width:140px;color:#ffffff;font-size:16px}
+    @media(max-width:560px){
+      #panelRoutine .row{flex-wrap:wrap}
+      #panelRoutine #routineTime{flex:1}
+    }
+  </style>
+  <script>
+    (function(){
+      const SESSION_KEY = 'planner.session.user';
+      const TASKS_KEY = 'planner.tasks.v1';
+      const ROUTINE_KEY = 'planner.routines.v1';
+
+      const user = (()=>{ try{return JSON.parse(sessionStorage.getItem(SESSION_KEY));}catch{return null} })();
+      if (!user) { location.href = 'login.html'; }
+
+      const state = {
+        tab: 'tasks',
+        tasks: loadJson(TASKS_KEY, []),
+        routines: loadJson(ROUTINE_KEY, [])
+      };
+
+      function loadJson(key, fallback){ try{ return JSON.parse(localStorage.getItem(key)) ?? fallback } catch { return fallback } }
+      function saveJson(key, value){ localStorage.setItem(key, JSON.stringify(value)); }
+
+      window.addEventListener('DOMContentLoaded', init);
+
+      function init(){
+        document.getElementById('userName').textContent = user?.name || 'User';
+        // Tabs
+        document.getElementById('tabTasks').addEventListener('click', ()=>setTab('tasks'));
+        document.getElementById('tabRoutine').addEventListener('click', ()=>setTab('routine'));
+
+        // Logout
+        document.getElementById('logout').addEventListener('click', ()=>{ sessionStorage.removeItem(SESSION_KEY); location.href='login.html'; });
+
+        // Task form
+        document.getElementById('taskForm').addEventListener('submit', onAddTask);
+
+        // Routine form
+        document.getElementById('routineForm').addEventListener('submit', onAddRoutine);
+
+        render();
+      }
+
+      function setTab(name){ state.tab = name; renderTabs(); renderPanels(); }
+
+      function render(){ renderTabs(); renderPanels(); }
+
+      function renderTabs(){
+        const t1 = document.getElementById('tabTasks');
+        const t2 = document.getElementById('tabRoutine');
+        t1.classList.toggle('active', state.tab==='tasks');
+        t2.classList.toggle('active', state.tab==='routine');
+      }
+
+      function renderPanels(){
+        document.getElementById('panelTasks').style.display = state.tab==='tasks' ? 'block' : 'none';
+        document.getElementById('panelRoutine').style.display = state.tab==='routine' ? 'block' : 'none';
+        renderTaskList();
+        renderRoutineList();
+      }
+
+      function onAddTask(e){
+        e.preventDefault();
+        const title = document.getElementById('taskTitle').value.trim();
+        const due = document.getElementById('taskDue').value;
+        if (!title){ document.getElementById('taskError').textContent='Please add a task title.'; return; }
+        document.getElementById('taskError').textContent='';
+        state.tasks.push({ id: 't'+Date.now(), title, due, done:false, createdAt: Date.now() });
+        saveJson(TASKS_KEY, state.tasks);
+        e.target.reset();
+        renderTaskList();
+      }
+
+      function toggleTask(id){
+        const t = state.tasks.find(x=>x.id===id); if(!t) return;
+        t.done = !t.done; saveJson(TASKS_KEY, state.tasks); renderTaskList();
+      }
+      function removeTask(id){
+        state.tasks = state.tasks.filter(x=>x.id!==id); saveJson(TASKS_KEY, state.tasks); renderTaskList();
+      }
+
+      function editTask(id){
+        const t = state.tasks.find(x=>x.id===id); if(!t) return;
+        const title = prompt('Edit task title:', t.title);
+        if (title===null) return;
+        const trimmed = title.trim(); if (!trimmed) return alert('Title cannot be empty.');
+        const due = prompt('Edit due date (YYYY-MM-DD) or empty:', t.due||'') || '';
+        t.title = trimmed; t.due = due; saveJson(TASKS_KEY, state.tasks); renderTaskList();
+      }
+
+      function renderTaskList(){
+        const list = document.getElementById('taskList');
+        list.innerHTML = '';
+        const tasks = [...state.tasks].sort((a,b)=> Number(a.done)-Number(b.done) || (a.due||'').localeCompare(b.due||''));
+        if (tasks.length===0){ const d=document.createElement('div'); d.className='muted'; d.textContent='No tasks yet. Add your first one!'; list.appendChild(d); return; }
+        tasks.forEach(t=>{
+          const el = document.createElement('div');
+          el.className = 'item'+(t.done?' done':'');
+          el.innerHTML = `
+            <input type="checkbox" ${t.done?'checked':''} aria-label="done" />
+            <div>
+              <div style="font-weight:700">${escapeHtml(t.title)}</div>
+              <div class="muted">${t.due?('Due: '+t.due):'No due date'}</div>
+            </div>
+            <div class="row">
+              <button class="btn small btn-ghost" data-act="edit">Edit</button>
+              <button class="btn small btn-ghost danger" data-act="del">Delete</button>
+            </div>
+          `;
+          el.querySelector('input').addEventListener('change', ()=>toggleTask(t.id));
+          el.querySelector('[data-act="del"]').addEventListener('click', ()=>removeTask(t.id));
+          el.querySelector('[data-act="edit"]').addEventListener('click', ()=>editTask(t.id));
+          list.appendChild(el);
+        });
+      }
+
+      // Routine
+      function onAddRoutine(e){
+        e.preventDefault();
+        const name = document.getElementById('routineName').value.trim();
+        const time = document.getElementById('routineTime').value;
+        const days = Array.from(document.querySelectorAll('input[name="days"]:checked')).map(x=>x.value);
+        if (!name || !time || days.length===0){ document.getElementById('routineError').textContent='Provide name, time, and at least one day.'; return; }
+        document.getElementById('routineError').textContent='';
+        state.routines.push({ id:'r'+Date.now(), name, time, days });
+        saveJson(ROUTINE_KEY, state.routines);
+        e.target.reset();
+        renderRoutineList();
+        setTab('routine');
+      }
+
+      function removeRoutine(id){ state.routines = state.routines.filter(x=>x.id!==id); saveJson(ROUTINE_KEY, state.routines); renderRoutineList(); }
+
+      function editRoutine(id){
+        const r = state.routines.find(x=>x.id===id); if(!r) return;
+        const name = prompt('Edit routine name:', r.name); if (name===null) return;
+        const time = prompt('Edit time (HH:MM):', r.time); if (time===null) return;
+        const days = prompt('Edit days (Mon,Tue,Wed,...):', r.days.join(',')); if (days===null) return;
+        const newDays = days.split(',').map(s=>s.trim()).filter(Boolean);
+        if (!name.trim() || !time || newDays.length===0) return alert('Invalid values.');
+        r.name = name.trim(); r.time = time; r.days = newDays;
+        saveJson(ROUTINE_KEY, state.routines); renderRoutineList();
+      }
+
+      function renderRoutineList(){
+        const list = document.getElementById('routineList');
+        list.innerHTML = '';
+        const routines = [...state.routines].sort((a,b)=> a.time.localeCompare(b.time));
+        if (routines.length===0){ const d=document.createElement('div'); d.className='muted'; d.textContent='No routines yet. Add one below.'; list.appendChild(d); return; }
+        routines.forEach(r=>{
+          const el = document.createElement('div');
+          el.className = 'item';
+          el.innerHTML = `
+            <div class="badge">⏰</div>
+            <div>
+              <div class="row" style="justify-content:space-between">
+                <div style="font-weight:700">${escapeHtml(r.name)}</div>
+                <div style="font-weight:800">${r.time}</div>
+              </div>
+              <div class="muted">${r.days.join(', ')}</div>
+            </div>
+            <div class="row">
+              <button class="btn small btn-ghost" data-act="edit">Edit</button>
+              <button class="btn small btn-ghost danger" data-act="del">Delete</button>
+            </div>
+          `;
+          el.querySelector('[data-act="del"]').addEventListener('click', ()=>removeRoutine(r.id));
+          el.querySelector('[data-act="edit"]').addEventListener('click', ()=>editRoutine(r.id));
+          list.appendChild(el);
+        });
+      }
+
+      // utils
+      function escapeHtml(s){ return s.replace(/[&<>"']/g, (c)=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])); }
+
+    })();
+  </script>
+</head>
+<body>
+  <header>
+    <div class="nav">
+      <div class="brand"><div class="logo" aria-hidden="true"></div><div>Daily Planner</div></div>
+      <div class="row">
+        <div class="user">Signed in as <span id="userName">User</span></div>
+        <button id="logout" class="btn-ghost small">Logout</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div class="tabs">
+      <button id="tabTasks" class="tab active">Tasks</button>
+      <button id="tabRoutine" class="tab">Routine</button>
+    </div>
+    <div class="panel">
+      <!-- Tasks Panel -->
+      <section id="panelTasks" class="section">
+        <form id="taskForm" class="row" style="margin-bottom:10px;flex-wrap:wrap">
+          <input id="taskTitle" class="grow" placeholder="What will you do today?" autocomplete="off" />
+          <input id="taskDue" type="date" />
+          <button class="btn" type="submit">Add Task</button>
+        </form>
+        <div id="taskError" class="muted" style="color:#f87171"></div>
+        <div id="taskList" class="list"></div>
+      </section>
+
+      <!-- Routine Panel -->
+      <section id="panelRoutine" class="section" style="display:none">
+        <div class="muted" style="font-weight:800;color:#e5e7eb;margin-bottom:6px">Add Routine</div>
+        <form id="routineForm" style="display:grid;gap:12px;margin-bottom:10px">
+          <div class="row">
+            <input id="routineName" class="grow" placeholder="Routine name (e.g., Morning Workout)" autocomplete="off" />
+            <input id="routineTime" type="time" />
+            
+          </div>
+          <div class="days">
+            <label class="chip"><input type="checkbox" name="days" value="Mon" /> Mon</label>
+            <label class="chip"><input type="checkbox" name="days" value="Tue" /> Tue</label>
+            <label class="chip"><input type="checkbox" name="days" value="Wed" /> Wed</label>
+            <label class="chip"><input type="checkbox" name="days" value="Thu" /> Thu</label>
+            <label class="chip"><input type="checkbox" name="days" value="Fri" /> Fri</label>
+            <label class="chip"><input type="checkbox" name="days" value="Sat" /> Sat</label>
+            <label class="chip"><input type="checkbox" name="days" value="Sun" /> Sun</label>
+          </div>
+          <div class="row" style="justify-content:flex-end"><button class="btn" type="submit">Add Routine</button></div>
+        </form>
+        <div id="routineError" class="muted" style="color:#f87171"></div>
+        <div id="routineList" class="list"></div>
+      </section>
+    </div>
+  </main>
+</body>
+</html>
+
+
